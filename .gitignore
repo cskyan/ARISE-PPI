@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local data and generated outputs
+data/
+resources/
+runs/
+runs_*/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.npy
+*.npz
+*.pssm
+*.pssm.txt
+
+# Current workspace datasets/results
+RBP400/
+GPSite_dataset/
+Dest/
+Dest_prepared/
+PP/
+pp_prepared/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

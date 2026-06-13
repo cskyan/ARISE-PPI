@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arise-ppi"
+version = "0.1.0"
+description = "ARISE-PPI training and prediction code for residue-level protein interaction analysis."
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "scikit-learn",
+    "torch",
+    "fair-esm",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
