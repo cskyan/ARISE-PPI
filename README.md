@@ -1,5 +1,5 @@
 # ARISE-PPI
-
+https://github.com/cskyan/ARISE-PPI/tree/main
 ARISE-PPI is a residue-level protein interaction analysis framework with two selectable operating modes:
 
 - `topk`: residue ranking and top-k evidence discovery.
