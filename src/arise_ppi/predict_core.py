@@ -1,14 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Prediction and case-study export for the L1-L3 RBP residue model.
-
-Default usage on the server:
-    python predict_L13_RBP400_binary_framework.py
-
-Common overrides:
-    python predict_L13_RBP400_binary_framework.py --split all
-    python predict_L13_RBP400_binary_framework.py --ids /path/to/my_ids.txt --out-dir /path/to/predictions
-    python predict_L13_RBP400_binary_framework.py --checkpoint /path/to/best_TOPK.pt --split test
-"""
+"""Prediction and case-study export for the ARISE-PPI residue model."""
 
 import argparse
 import csv
@@ -67,30 +58,30 @@ from .config import Params, build_model_config as _fallback_build_model_config  
 P = getattr(trainlib, "P", Params.from_env())
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, os.pardir, os.pardir))
-_LOCAL_RBP400_ROOT = os.path.join(_PROJECT_ROOT, "data", "RBP400")
-RBP400_ROOT = _LOCAL_RBP400_ROOT
-RBP400_SAVE_DIR = os.path.join(_PROJECT_ROOT, "runs", "rbp400")
+_LOCAL_DATA_ROOT = os.path.join(_PROJECT_ROOT, "data", "dataset")
+DEFAULT_DATA_ROOT = _LOCAL_DATA_ROOT
+DEFAULT_SAVE_DIR = os.path.join(_PROJECT_ROOT, "runs", "arise_ppi")
 _CLI_HAS_ROOT = any(x == "--root" or x.startswith("--root=") for x in sys.argv[1:])
 _CLI_HAS_SAVE_DIR = any(x == "--save-dir" or x.startswith("--save-dir=") for x in sys.argv[1:])
-_EXPLICIT_DATA_ROOT = any(k in os.environ for k in ("RBP400_ROOT", "DATA_ROOT", "CUSTOM_DATA_ROOT"))
+_EXPLICIT_DATA_ROOT = any(k in os.environ for k in ("DATA_ROOT", "CUSTOM_DATA_ROOT"))
 if (not _CLI_HAS_ROOT) and (not _EXPLICIT_DATA_ROOT):
-    P.rbp_root = RBP400_ROOT
-    P.dips_root = RBP400_ROOT
-    _ws = os.path.dirname(RBP400_ROOT)
-    P.rbp_id_list = os.path.join(_ws, "RBP400_full_accessions.txt")
-    P.rbp_train_list = os.path.join(_ws, "RBP400_split_train.txt")
-    P.rbp_val_list = os.path.join(_ws, "RBP400_split_val.txt")
-    P.rbp_test_list = os.path.join(_ws, "RBP400_split_test.txt")
+    P.rbp_root = DEFAULT_DATA_ROOT
+    P.dips_root = DEFAULT_DATA_ROOT
+    _ws = os.path.dirname(DEFAULT_DATA_ROOT)
+    P.rbp_id_list = os.path.join(_ws, "all_ids.txt")
+    P.rbp_train_list = os.path.join(_ws, "train.txt")
+    P.rbp_val_list = os.path.join(_ws, "val.txt")
+    P.rbp_test_list = os.path.join(_ws, "test.txt")
 if (not _CLI_HAS_SAVE_DIR) and (not any(k in os.environ for k in ("SAVE_DIR", "save_dir"))):
-    P.save_dir = os.environ.get("RBP400_SAVE_DIR", RBP400_SAVE_DIR)
+    P.save_dir = DEFAULT_SAVE_DIR
 P.dataset_mode = os.environ.get("DATASET_MODE", "rbp").lower()
 P.primary_objective = (
     os.environ.get("PRIMARY_OBJECTIVE")
     or os.environ.get("TASK")
     or getattr(P, "primary_objective", "topk")
 ).lower()
-P.sequence_mode = str(os.environ.get("RBP400_SEQUENCE_MODE", getattr(P, "sequence_mode", "esm"))).lower()
-P.rbp_structure_dir = os.environ.get("RBP400_STRUCTURE_DIR", getattr(P, "rbp_structure_dir", "structures") or "structures")
+P.sequence_mode = str(os.environ.get("SEQUENCE_MODE", getattr(P, "sequence_mode", "esm"))).lower()
+P.rbp_structure_dir = os.environ.get("STRUCTURE_DIR", getattr(P, "rbp_structure_dir", "structures") or "structures")
 P.structure_source = os.environ.get("STRUCTURE_SOURCE", getattr(P, "structure_source", "pdb") or "pdb").lower()
 _USE_HMM_FOR_PREDICT = (
     str(os.environ.get("use_hmm", os.environ.get("USE_HMM", str(int(bool(getattr(P, "use_hmm", False))))))).strip().lower()
@@ -137,13 +128,13 @@ def resolve_ids(args) -> Tuple[List[str], str]:
     if args.ids:
         return read_ids(args.ids), args.ids
     split = str(args.split).lower()
-    root = os.path.abspath(str(getattr(P, "rbp_root", RBP400_ROOT)))
+    root = os.path.abspath(str(getattr(P, "rbp_root", DEFAULT_DATA_ROOT)))
     parent = os.path.dirname(root)
-    rbp400_fallbacks = {
-        "train": [os.path.join(parent, "RBP400_split_train.txt"), os.path.join(root, "train.txt")],
-        "val": [os.path.join(parent, "RBP400_split_val.txt"), os.path.join(root, "val.txt")],
-        "test": [os.path.join(parent, "RBP400_split_test.txt"), os.path.join(root, "test.txt")],
-        "all": [os.path.join(parent, "RBP400_full_accessions.txt"), os.path.join(root, "all_ids.txt")],
+    split_fallbacks = {
+        "train": [os.path.join(parent, "train.txt"), os.path.join(root, "train.txt")],
+        "val": [os.path.join(parent, "val.txt"), os.path.join(root, "val.txt")],
+        "test": [os.path.join(parent, "test.txt"), os.path.join(root, "test.txt")],
+        "all": [os.path.join(parent, "all_ids.txt"), os.path.join(root, "all_ids.txt")],
     }
     if split == "train":
         path = P.rbp_train_list
@@ -156,7 +147,7 @@ def resolve_ids(args) -> Tuple[List[str], str]:
     else:
         path = args.split
     if not path or not os.path.exists(path):
-        for cand in rbp400_fallbacks.get(split, []):
+        for cand in split_fallbacks.get(split, []):
             if cand and os.path.exists(cand):
                 path = cand
                 break
@@ -743,7 +734,7 @@ def predict(args):
                     "accession": pid,
                     "mode": "site",
                     "bridge_available": 0,
-                    "note": "RBP400 site-mode exports L1 residue/top-k evidence; pair bridge evidence is produced in pair-mode.",
+                    "note": "Site mode exports L1 residue and top-k evidence; pair bridge evidence is produced in pair mode.",
                     "topk": int(k_rank),
                     "topk_mean_prob": float(np.mean([float(x["prob"]) for x in ranking_rows if x["accession"] == pid])) if k_rank > 0 else 0.0,
                     "topk_mean_ager_score": float(np.mean([float(x["ager_score"]) for x in ranking_rows if x["accession"] == pid])) if k_rank > 0 else 0.0,
@@ -789,8 +780,8 @@ def predict(args):
         try:
             val_path = str(getattr(P, "rbp_val_list", "") or "")
             if not val_path or not os.path.exists(val_path):
-                parent = os.path.dirname(os.path.abspath(str(getattr(P, "rbp_root", RBP400_ROOT))))
-                fallback_val = os.path.join(parent, "RBP400_split_val.txt")
+                parent = os.path.dirname(os.path.abspath(str(getattr(P, "rbp_root", DEFAULT_DATA_ROOT))))
+                fallback_val = os.path.join(parent, "val.txt")
                 if os.path.exists(fallback_val):
                     val_path = fallback_val
             val_ids = read_ids(val_path)
@@ -909,7 +900,7 @@ def write_protocol_metrics(out_dir: str, metrics: Dict, topk_metrics: Dict):
     }
     write_tsv(os.path.join(out_dir, "protocol_metrics.tsv"), [row])
     with open(os.path.join(out_dir, "protocol_metrics.log"), "w", encoding="utf-8") as f:
-        f.write("RBP400 top-k protocol summary generated by predict_L13_RBP400_binary_framework.py\n")
+        f.write("Top-k protocol summary generated by ARISE-PPI prediction.\n")
         f.write("This protocol keeps top-k metrics as primary and reports binary metrics only as diagnostics.\n")
         f.write(json.dumps(row, indent=2, ensure_ascii=False))
         f.write("\n")

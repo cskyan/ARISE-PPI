@@ -42,14 +42,14 @@ def _env_str(key: str, default: str) -> str:
 class Params:
     # ---- objective / data root ----
     primary_objective: str = "topk"
-    rbp_root: str = "data/RBP400"
-    rbp_id_list: str = "data/RBP400_full_accessions.txt"
-    rbp_train_list: str = "data/RBP400_split_train.txt"
-    rbp_val_list: str = "data/RBP400_split_val.txt"
-    rbp_test_list: str = "data/RBP400_split_test.txt"
-    dips_train_list: str = "data/RBP400_full_accessions.txt"
-    dips_val_list: str = "data/RBP400_full_accessions.txt"
-    save_dir: str = "runs/rbp400"
+    rbp_root: str = "data/dataset"
+    rbp_id_list: str = "data/all_ids.txt"
+    rbp_train_list: str = "data/train.txt"
+    rbp_val_list: str = "data/val.txt"
+    rbp_test_list: str = "data/test.txt"
+    dips_train_list: str = "data/train.txt"
+    dips_val_list: str = "data/val.txt"
+    save_dir: str = "runs/arise_ppi"
     save_epoch_ckpts: bool = False
     esm_local_dir: str = "resources/esm"
     rbp_structure_dir: str = "structures"

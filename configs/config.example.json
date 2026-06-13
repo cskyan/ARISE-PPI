@@ -1,0 +1,16 @@
+{
+  "task": "topk",
+  "root": "...",
+  "id_list": "...",
+  "train_list": "...",
+  "val_list": "...",
+  "test_list": "...",
+  "save_dir": "runs/arise_ppi",
+  "esm_local_dir": "...",
+  "structure_dir": "structures",
+  "sequence_mode": "esm",
+  "structure_source": "pdb",
+  "epochs": 80,
+  "batch_size": 4,
+  "num_workers": 0
+}

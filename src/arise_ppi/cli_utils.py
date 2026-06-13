@@ -10,14 +10,14 @@ from typing import Any, Dict
 
 ENV_KEYS = {
     "task": "PRIMARY_OBJECTIVE",
-    "root": "RBP400_ROOT",
+    "root": "DATA_ROOT",
     "id_list": "ID_LIST",
     "train_list": "TRAIN_LIST",
     "val_list": "VAL_LIST",
     "test_list": "TEST_LIST",
     "save_dir": "SAVE_DIR",
     "esm_local_dir": "ESM_LOCAL_DIR",
-    "structure_dir": "RBP400_STRUCTURE_DIR",
+    "structure_dir": "STRUCTURE_DIR",
     "sequence_mode": "SEQUENCE_MODE",
     "structure_source": "STRUCTURE_SOURCE",
     "epochs": "EPOCHS",

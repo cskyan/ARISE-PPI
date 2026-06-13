@@ -18,7 +18,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train ARISE-PPI.")
     parser.add_argument("--config", help="JSON config file. CLI values override it.")
     parser.add_argument("--task", choices=["topk", "binary"], default=None, help="Training objective.")
-    parser.add_argument("--root", help="Dataset root, e.g. /path/to/RBP400.")
+    parser.add_argument("--root", help="Dataset root.")
     parser.add_argument("--id-list", dest="id_list", help="All protein IDs.")
     parser.add_argument("--train-list", dest="train_list", help="Training ID list.")
     parser.add_argument("--val-list", dest="val_list", help="Validation ID list.")

@@ -16,7 +16,7 @@ def _bmask(x: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
 
 
 class FiLM(nn.Module):
-    """链级特征条件调制 (Feature-wise Linear Modulation)."""
+    """"""
 
     def __init__(self, d_model: int, d_chain: int):
         super().__init__()
@@ -64,7 +64,7 @@ class SwiGLUFFN(nn.Module):
 
 
 class SelfEnc(nn.Module):
-    """堆叠版 TransformerEncoder (Pre-LN)."""
+    """"""
 
     def __init__(self, d: int, n_layers: int, h: int, drop: float):
         super().__init__()
@@ -88,7 +88,7 @@ class SelfEnc(nn.Module):
 
 
 class CrossBlock(nn.Module):
-    """双链交叉注意力 + 自注意力 + FFN (Pre-LN + LayerScale)."""
+    """"""
 
     def __init__(self, d, h, drop, use_layerscale=False, layerscale_init=1e-4,
                  use_swiglu=False, ffn_mult=4.0):
@@ -187,7 +187,6 @@ class FragmentHead(nn.Module):
         self.depthwise = nn.Conv1d(d_model, d_model, kernel_size,
                                    padding=kernel_size // 2, groups=d_model, bias=False)
         # Bug C fix: replace BatchNorm1d with GroupNorm.
-        # BatchNorm1d depends on batch statistics → unstable with B=1, and
         # train/eval behaviour differs. GroupNorm normalises per-channel within
         # each sample independently, which is always stable regardless of B or L.
         # num_groups=min(32, d_model) is a good default for d_model=384.
@@ -219,19 +218,18 @@ class FragmentHead(nn.Module):
 
 
 # ============================================================
-# [创新点1] Evidence Bridge: L1 Residue → L3 Pair Evidence
 # ============================================================
 
 
 class EvidenceBridge(nn.Module):
     """
-    把 L1 residue evidence 聚合为真正的 residue-pair evidence，再压缩成
-    支撑 L3 的 pair-aware evidence vector。
+     L1 residue evidence  residue-pair evidence
+     L3  pair-aware evidence vector
 
-    关键改动:
-      1. 先做单链 Top-K residue 选择；
-      2. 再在 Top-K × Top-K 上构造 residue-pair 证据矩阵；
-      3. 返回显式 residue-pair ranking，便于 case study 直接使用。
+    :
+      1.  Top-K residue 
+      2.  Top-K  Top-K  residue-pair 
+      3.  residue-pair ranking case study 
     """
 
     def __init__(self, d_model: int, d_proj: int = 64, n_heads: int = 4,
@@ -323,7 +321,6 @@ class EvidenceBridge(nn.Module):
             logit_B, fB_gated, maskB, self.k, self.frac
         )
 
-        # 真正的 pair-aware residue-pair evidence
         nA = F.normalize(topk_fA, dim=-1)
         nB = F.normalize(topk_fB, dim=-1)
         compat = torch.einsum("bkd,bqd->bkq", nA, nB) / math.sqrt(max(1, self.d_proj))
@@ -509,27 +506,25 @@ class L2Bridge(nn.Module):
 
 
 # ============================================================
-# [创新点2] L3 Head: Dual Output (判定 + 解释)
 # ============================================================
 
 class L3Head(nn.Module):
     """
     Protein-level interaction head.
 
-    输入:
+    :
       global_A:  [B, D]        chain A global representation (mean pool)
       global_B:  [B, D]        chain B global representation (mean pool)
       evi_vec:   [B, 2*d_proj] pair-aware evidence vector from EvidenceBridge
 
-    输出:
-      pair_logit: [B]   protein-level interaction logit (判定输出)
-      注: evi_score 来自 EvidenceBridge (解释输出)，两者共同构成双输出
+    :
+      pair_logit: [B]   protein-level interaction logit ()
+      : evi_score  EvidenceBridge ()
     """
 
     def __init__(self, d_model: int, d_proj: int = 64, d_hidden: int = 256,
                  n_layers: int = 2, dropout: float = 0.2):
         super().__init__()
-        # 输入: [gA; gB; evi_vec] → concat → MLP
         d_in = d_model * 2 + d_proj * 2
         layers = []
         d_cur = d_in

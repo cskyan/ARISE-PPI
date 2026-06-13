@@ -23,12 +23,21 @@ checkpoints/
 *.pssm.txt
 
 # Current workspace datasets/results
-RBP400/
-GPSite_dataset/
+dataset/
+/[R]BP400/
+[G]PSite_dataset/
 Dest/
 Dest_prepared/
 PP/
 pp_prepared/
+
+# Legacy workspace files kept out of the release package
+/*.py
+/*.txt
+/*.tsv
+/*.xlsx
+/*.csv
+/*.pkl
 
 # OS/editor
 .DS_Store

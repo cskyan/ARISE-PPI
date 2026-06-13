@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-"""train_L13_pdb_gvp.py
-结构源接 pdb/coords，返回 coordsA/coordsB，并将结构交给 GVP 编码后再进入 L1→L3 主干。
-"""
+"""Core training implementation for ARISE-PPI."""
 
 import os, math, time, random, re, uuid, gzip, hashlib, glob, json, shutil
 import numpy as np
@@ -55,23 +53,21 @@ from .config import Params, build_model_config
 from .model import L13PDBGVPModel
 
 # ============================================================
-# 全局配置
 # ============================================================
 P = Params.from_env()
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, os.pardir, os.pardir))
-_LOCAL_RBP400_ROOT = os.path.join(_PROJECT_ROOT, "data", "RBP400")
-_DEFAULT_RBP400_ROOT = _LOCAL_RBP400_ROOT
-_DEFAULT_RBP400_SAVE_DIR = os.path.join(_PROJECT_ROOT, "runs", "rbp400")
+_LOCAL_DATA_ROOT = os.path.join(_PROJECT_ROOT, "data", "dataset")
+_DEFAULT_DATA_ROOT = _LOCAL_DATA_ROOT
+_DEFAULT_SAVE_DIR = os.path.join(_PROJECT_ROOT, "runs", "arise_ppi")
 
-def _force_rbp400_binary_params(p):
+def _configure_params(p):
     """Configure RBP-style residue training from environment/CLI overrides."""
     data_root = (
-        os.environ.get("RBP400_ROOT")
-        or os.environ.get("DATA_ROOT")
+        os.environ.get("DATA_ROOT")
         or os.environ.get("CUSTOM_DATA_ROOT")
-        or _DEFAULT_RBP400_ROOT
+        or _DEFAULT_DATA_ROOT
     )
     data_root = os.path.abspath(str(data_root))
     p.dataset_mode = os.environ.get("DATASET_MODE", "rbp").lower()
@@ -83,24 +79,24 @@ def _force_rbp400_binary_params(p):
     p.dips_root = data_root
     p.rbp_root = data_root
     workspace_root = os.path.dirname(data_root)
-    p.rbp_id_list = os.environ.get("ID_LIST", os.path.join(workspace_root, "RBP400_full_accessions.txt"))
-    p.rbp_train_list = os.environ.get("TRAIN_LIST", os.path.join(workspace_root, "RBP400_split_train.txt"))
-    p.rbp_val_list = os.environ.get("VAL_LIST", os.path.join(workspace_root, "RBP400_split_val.txt"))
-    p.rbp_test_list = os.environ.get("TEST_LIST", os.path.join(workspace_root, "RBP400_split_test.txt"))
+    p.rbp_id_list = os.environ.get("ID_LIST", os.path.join(workspace_root, "all_ids.txt"))
+    p.rbp_train_list = os.environ.get("TRAIN_LIST", os.path.join(workspace_root, "train.txt"))
+    p.rbp_val_list = os.environ.get("VAL_LIST", os.path.join(workspace_root, "val.txt"))
+    p.rbp_test_list = os.environ.get("TEST_LIST", os.path.join(workspace_root, "test.txt"))
     p.dips_train_list = p.rbp_train_list
     p.dips_val_list = p.rbp_val_list
     p.dips_test_list = p.rbp_test_list
     p.save_dir = os.environ.get(
-        "RBP400_SAVE_DIR",
-        os.environ.get("SAVE_DIR", _DEFAULT_RBP400_SAVE_DIR),
+        "SAVE_DIR",
+        _DEFAULT_SAVE_DIR,
     )
-    p.rbp_structure_dir = os.environ.get("RBP400_STRUCTURE_DIR", getattr(p, "rbp_structure_dir", "structures") or "structures")
+    p.rbp_structure_dir = os.environ.get("STRUCTURE_DIR", getattr(p, "rbp_structure_dir", "structures") or "structures")
     p.structure_source = os.environ.get("STRUCTURE_SOURCE", getattr(p, "structure_source", "pdb") or "pdb").lower()
     p.use_pssm = True
     p.use_dssp = True
 
     seq_mode = (
-        os.environ.get("RBP400_SEQUENCE_MODE")
+        os.environ.get("SEQUENCE_MODE")
         or os.environ.get("sequence_mode")
         or os.environ.get("SEQUENCE_MODE")
         or getattr(p, "sequence_mode", "esm")
@@ -114,7 +110,7 @@ def _force_rbp400_binary_params(p):
     p.eval_neg_ratio = float(os.environ.get("EVAL_NEG_RATIO", getattr(p, "eval_neg_ratio", 1.0)))
 
     # Keep binary/site prediction as the main objective. Newer framework
-    # components remain configurable but are scoped to RBP400 only.
+    # Newer framework components remain configurable.
     p.site_head_type = os.environ.get(
         "site_head_type",
         os.environ.get("SITE_HEAD_TYPE", str(getattr(p, "site_head_type", "amleh"))),
@@ -135,20 +131,20 @@ def _force_rbp400_binary_params(p):
     return p
 
 
-P = _force_rbp400_binary_params(P)
+P = _configure_params(P)
 
 def _apply_current_data_root(p):
-    """RBP400-only explicit root override."""
-    root = os.environ.get("RBP400_ROOT") or os.environ.get("DATA_ROOT") or os.environ.get("CUSTOM_DATA_ROOT") or ""
+    """Apply explicit data root overrides."""
+    root = os.environ.get("DATA_ROOT") or os.environ.get("CUSTOM_DATA_ROOT") or ""
     if str(root).strip():
         root = os.path.abspath(str(root).strip())
         workspace_root = os.path.dirname(root)
         p.rbp_root = root
         p.dips_root = root
-        p.rbp_id_list = os.environ.get("ID_LIST", os.path.join(workspace_root, "RBP400_full_accessions.txt"))
-        p.rbp_train_list = os.environ.get("TRAIN_LIST", os.path.join(workspace_root, "RBP400_split_train.txt"))
-        p.rbp_val_list = os.environ.get("VAL_LIST", os.path.join(workspace_root, "RBP400_split_val.txt"))
-        p.rbp_test_list = os.environ.get("TEST_LIST", os.path.join(workspace_root, "RBP400_split_test.txt"))
+        p.rbp_id_list = os.environ.get("ID_LIST", os.path.join(workspace_root, "all_ids.txt"))
+        p.rbp_train_list = os.environ.get("TRAIN_LIST", os.path.join(workspace_root, "train.txt"))
+        p.rbp_val_list = os.environ.get("VAL_LIST", os.path.join(workspace_root, "val.txt"))
+        p.rbp_test_list = os.environ.get("TEST_LIST", os.path.join(workspace_root, "test.txt"))
         p.dips_train_list = p.rbp_train_list
         p.dips_val_list = p.rbp_val_list
         p.dips_test_list = p.rbp_test_list
@@ -231,7 +227,6 @@ def _deranged_perm(B: int, device=None) -> torch.Tensor:
 
 
 # ============================================================
-# 数据工具函数 (与原始 trainl12_binA_unified 保持一致)
 # ============================================================
 
 _AA_ALLOWED = set("ACDEFGHIKLMNPQRSTVWYBXZUO")
@@ -407,9 +402,9 @@ def _configured_dssp_dim(default: int = 9) -> int:
 
 def _load_coords(coords_npz: str):
     """
-    从 npz 读取 CA 坐标.
-    返回 (coords [L,3], mask [L]) 或 (None, None).
-    注意: coords 只在 __getitem__ 内部用于生成 y2d，不会出现在 batch 里.
+     npz  CA .
+     (coords [L,3], mask [L])  (None, None).
+    : coords  __getitem__  y2d batch .
     """
     if coords_npz is None or not os.path.exists(coords_npz):
         return None, None
@@ -440,10 +435,10 @@ def _load_coords(coords_npz: str):
 
 def _pairwise_contact(coordsA, coordsB, maskA, maskB, cutoff=8.0):
     """
-    从 CA 坐标计算残基对接触 contact map [La, Lb].
+     CA  contact map [La, Lb].
 
-    这是唯一使用 3D 结构的地方，输出只是 0/1 二值标签。
-    模型本身不看 3D 坐标。
+     3D  0/1 
+     3D 
     """
     La, Lb = coordsA.shape[0], coordsB.shape[0]
     vA = maskA.bool() if maskA is not None else torch.ones(La, dtype=torch.bool)
@@ -654,25 +649,23 @@ class SiteEmbedder:
 
 # ============================================================
 # DIPSIndexedPairs Dataset
-# 与原始 trainl12_binA_unified 中的实现完全一致，
-# 只在 __getitem__ 返回值中额外添加 has_contact 字段
 # ============================================================
 
 class DIPSIndexedPairs(torch.utils.data.Dataset):
     """
-    DIPS-Plus 索引数据集，带 ESM 缓存和固定 1309-d 残基特征.
+    DIPS-Plus  ESM  1309-d .
 
-    返回的 dict:
-      resA, resB      : [La/Lb, D]  残基特征 (ESM 1280 + PSSM 20 + DSSP 9)
-      maskA, maskB    : [La/Lb]     有效位 mask (float 0/1)
-      y2d             : [La, Lb]    残基对接触标签 (来自 CA coords, 仅用于 L1 监督)
-      y_res_A, y_res_B: [La/Lb]     残基级 interface label (= y2d.max)
-      has_contact     : float 0/1   该蛋白对是否有接触 → collate 后成为 y_pair
-      complex         : str         复合体 ID
+     dict:
+      resA, resB      : [La/Lb, D]   (ESM 1280 + PSSM 20 + DSSP 9)
+      maskA, maskB    : [La/Lb]      mask (float 0/1)
+      y2d             : [La, Lb]     ( CA coords,  L1 )
+      y_res_A, y_res_B: [La/Lb]      interface label (= y2d.max)
+      has_contact     : float 0/1     collate  y_pair
+      complex         : str          ID
 
-    注意: 3D 坐标 (cA, cB) 只在 __getitem__ 内部使用，不出现在返回值里.
-    L3 的监督信号 (y_pair) 来自 has_contact + in-batch negatives，
-    不需要额外的 PDB 注释文件.
+    : 3D  (cA, cB)  __getitem__ .
+    L3  (y_pair)  has_contact + in-batch negatives
+     PDB .
     """
 
     def __init__(self, dips_root, complex_ids, contact_cutoff=8.0, embedder=None,
@@ -940,7 +933,6 @@ class DIPSIndexedPairs(torch.utils.data.Dataset):
 
         mode = r[0]
         if mode == "split":
-            # split mode: 每条链一个 coords 文件 (原始 DIPS-Plus 标准格式)
             _, cA_p, cB_p, sA_p, sB_p, pA_p, pB_p, dA_p, dB_p, tagA, tagB = r
             load_fn_A = _load_pdb_ca if str(cA_p).lower().endswith((".pdb", ".ent", ".pdb.gz", ".ent.gz")) else _load_coords
             load_fn_B = _load_pdb_ca if str(cB_p).lower().endswith((".pdb", ".ent", ".pdb.gz", ".ent.gz")) else _load_coords
@@ -950,7 +942,6 @@ class DIPSIndexedPairs(torch.utils.data.Dataset):
                 raise FileNotFoundError(f"[DIPS] missing structure: {cid}")
             L, M = cA.shape[0], cB.shape[0]
         else:
-            # pair mode: 优先读取 pair npz；若是单个 pdb 文件则不支持并返回错误
             _, cP_p, sP_p, pP_p, dP_p = r
             if str(cP_p).lower().endswith((".pdb", ".ent", ".pdb.gz", ".ent.gz")):
                 raise RuntimeError(f"[DIPS] pair mode with single pdb is unsupported: {cid}")
@@ -1015,10 +1006,6 @@ class DIPSIndexedPairs(torch.utils.data.Dataset):
         resA, chainA = _assemble(sA_p, pA_p, dA_p, L, tagA, cA)
         resB, chainB = _assemble(sB_p, pB_p, dB_p, M, tagB, cB)
 
-        # ── 核心: 从 3D coords 生成 y2d ──────────────────────────────
-        # 这是数据集中唯一涉及 3D 结构的步骤
-        # y2d 是 0/1 二值标签，不是坐标本身
-        # 模型不会看到 cA, cB，它们在这里用完就丢弃
         y2d = _pairwise_contact(cA, cB, mA, mB, cutoff=self.cutoff)
 
         LA, LB = resA.shape[0], resB.shape[0]
@@ -1026,13 +1013,9 @@ class DIPSIndexedPairs(torch.utils.data.Dataset):
         if y2d.shape[0] != LA or y2d.shape[1] != LB:
             y2d = y2d[:LA, :LB]
 
-        y_res_A = y2d.max(dim=1).values   # [LA] 残基级 interface label
+        y_res_A = y2d.max(dim=1).values
         y_res_B = y2d.max(dim=0).values   # [LB]
 
-        # has_contact: 该 pair 是否存在 interface contact
-        # True  = 真实接触对 (DIPS 中几乎全部如此)
-        # False = 无接触 (在 DIPS 里极少，理论上不应出现)
-        # 在 forward_one 里, 通过 chain shuffle 生成 has_contact=False 的人为负样本
         has_contact = float(y2d.sum() > 0)
 
         return {
@@ -1045,10 +1028,10 @@ class DIPSIndexedPairs(torch.utils.data.Dataset):
             "maskB":       mB.float(),                 # [LB]
             "chainA":      chainA if chainA is not None else torch.zeros(12),
             "chainB":      chainB if chainB is not None else torch.zeros(12),
-            "y2d":         y2d,                        # [LA, LB] — 来自 PDB/coords
-            "y_res_A":     y_res_A,                    # [LA]     — L1 监督信号
-            "y_res_B":     y_res_B,                    # [LB]     — L1 监督信号
-            "has_contact": torch.tensor(has_contact),  # scalar   — L3 y_pair 基础
+            "y2d":         y2d,
+            "y_res_A":     y_res_A,
+            "y_res_B":     y_res_B,
+            "has_contact": torch.tensor(has_contact),
         }
 
 
@@ -1380,14 +1363,14 @@ def _read_rbp_id_list(path: str) -> List[str]:
                 continue
             if s.startswith('>'):
                 tok = s[1:].split()[0].strip()
-                tok = re.sub(r'\.(npy|npz|pt|fa|fasta|txt)(\.(gz))?$', '', tok, flags=re.IGNORECASE)
+                tok = re.sub(r'\.(npy|npz|pt|fa|fasta|txt)(\.gz)?$', '', tok, flags=re.IGNORECASE)
                 if tok:
                     header_ids.append(tok)
                 continue
             if header_ids:
                 continue
             tok = s.split()[0].strip()
-            tok = re.sub(r'\.(npy|npz|pt|fa|fasta|txt)(\.(gz))?$', '', tok, flags=re.IGNORECASE)
+            tok = re.sub(r'\.(npy|npz|pt|fa|fasta|txt)(\.gz)?$', '', tok, flags=re.IGNORECASE)
             if tok and tok not in seen:
                 out.append(tok); seen.add(tok)
     if header_ids:
@@ -1581,7 +1564,7 @@ class RBP296Dataset(torch.utils.data.Dataset):
             if self.verbose:
                 print(f"[RBP][warn] no structure found for {pid} "
                       f"(searched {getattr(P, 'rbp_structure_dir', 'structures_af')} / pdb / coords); "
-                      f"using pseudo-coords — GVP geometry features will be zero.", flush=True)
+                      f"using pseudo-coords  GVP geometry features will be zero.", flush=True)
         coordsA = _fit_len_coords(coordsA, L)
         if self.use_geom:
             gf = _geom_features_from_ca(coordsA)
@@ -1616,9 +1599,9 @@ class RBP296Dataset(torch.utils.data.Dataset):
 
 def dips_collate(batch: List[Dict]) -> Dict:
     """
-    Collate + 对齐检查.
-    has_contact → y_pair (原始 pair 的 protein-level label).
-    in-batch negatives 在 forward_one 里生成，不在这里处理.
+    Collate + .
+    has_contact  y_pair ( pair  protein-level label).
+    in-batch negatives  forward_one .
     """
     for i, d in enumerate(batch):
         y2d = d.get("y2d"); rA = d.get("resA"); rB = d.get("resB")
@@ -1668,15 +1651,12 @@ def dips_collate(batch: List[Dict]) -> Dict:
         else:
             out[k] = [d[k] for d in batch]
 
-    # y_pair = has_contact (原始 pair 标签)
-    # 负样本通过 forward_one 里的 chain shuffle 构造
     if "has_contact" in out:
         out["y_pair"] = out["has_contact"]   # [B] float 0/1
     return out
 
 
 # ============================================================
-# In-batch Negative 生成
 # ============================================================
 
 def make_inbatch_negatives(batch: Dict, device: str, neg_ratio: float = 0.5
@@ -1685,8 +1665,8 @@ def make_inbatch_negatives(batch: Dict, device: str, neg_ratio: float = 0.5
                                       Optional[torch.Tensor], Optional[torch.Tensor],
                                       torch.Tensor]:
     """
-    在 batch 内通过 chain shuffle 生成负样本对.
-    同时返回 chainA_neg / chainB_neg，避免链级特征在负样本上丢失。
+     batch  chain shuffle .
+     chainA_neg / chainB_neg
     """
     B = batch["resA"].size(0)
     if B <= 1 or neg_ratio <= 0:
@@ -2169,7 +2149,6 @@ def _site_evidence_pool_loss(logit_res, labels, mask, top_frac=0.05, pos_weight=
 
 
 # ============================================================
-# [创新点3] Cross-level Consistency Loss
 # ============================================================
 
 def cross_level_consistency_loss(
@@ -2180,10 +2159,10 @@ def cross_level_consistency_loss(
         pos_support_w=0.4, neg_pair_suppress_w=0.2,
         device="cuda"):
     """
-    三个约束:
-    1. 正 pair: A/B 两条链都应呈现集中而非散乱的 residue evidence；
-    2. 负 pair: evi_score 与 residue evidence 都不应虚高；
-    3. pair_logit 与 evi_score 应方向一致。
+    :
+    1.  pair: A/B  residue evidence
+    2.  pair: evi_score  residue evidence 
+    3. pair_logit  evi_score 
     """
     pos_m = pair_label > 0.5
     neg_m = ~pos_m
@@ -2261,11 +2240,11 @@ def cross_level_consistency_loss(
 def forward_one(model: L13PDBGVPModel, batch: Dict, ep: int
                 ) -> Tuple[Dict, torch.Tensor, Dict]:
     """
-    单次前向传播 + 完整 loss 计算.
-    修复点:
-      - 正负样本 forward 会覆盖 model._cache，因此训练损失不再依赖共享 cache；
-      - CL 使用正负样本各自的 A/B residue logits，而不是拿 0 去填 B 链；
-      - 负样本链级特征 chainB_neg 会一起传入。
+     +  loss .
+    :
+      -  forward  model._cache cache
+      - CL  A/B residue logits 0  B 
+      -  chainB_neg 
     """
     device = DEVICE
     aux    = {}
@@ -2681,7 +2660,7 @@ def eval_binary(model, dl, device=DEVICE, fixed_thr=None, threshold_mode=None):
     saved_l2_geom_prior_w = None
     if l2_bridge is not None and hasattr(l2_bridge, "geom_prior_w"):
         saved_l2_geom_prior_w = float(l2_bridge.geom_prior_w)
-        # Validation geometry prior is controlled by config_L13.Params.eval_l2_geom_prior_w.
+        # Validation geometry prior is controlled by Params.eval_l2_geom_prior_w.
         # Environment variables EVAL_L2_GEOM_PRIOR_W / eval_l2_geom_prior_w can still override it.
         # MedAUC boost mode: validation geometry prior defaults to the training geometry prior.
         # This avoids the previous mismatch: train_EB_geom_w=1.00 but eval_EB_geom_w=0.00.
@@ -3340,7 +3319,7 @@ def build_loaders():
             va_ids = pro_ids[:n_va]
             tr_ids = pro_ids[n_va:]
             print(
-                f"[RBP400] using pro_train fallback for train/val split: train={len(tr_ids)} val={len(va_ids)}; "
+                f"[data] using pro_train fallback for train/val split: train={len(tr_ids)} val={len(va_ids)}; "
                 f"configured test remains held out as test={len(te_ids)}",
                 flush=True,
             )
@@ -3348,7 +3327,7 @@ def build_loaders():
             pass
         elif os.path.basename(os.path.normpath(str(DIPS_ROOT))) in ("prepared",):
             raise RuntimeError(
-                f"[RBP400] expected split files but did not find usable train/val lists: "
+                f"[data] expected split files but did not find usable train/val lists: "
                 f"train={getattr(P, 'rbp_train_list', '')} val={getattr(P, 'rbp_val_list', '')}"
             )
         else:
@@ -3436,7 +3415,7 @@ def build_loaders():
 
     nw = NUM_WORKERS_SITE
     if DEVICE.startswith('cuda') and nw > 0 and not bool(getattr(P, "allow_cuda_workers", False)):
-        print('[data] DEVICE=cuda → num_workers=0', flush=True)
+        print('[data] DEVICE=cuda  num_workers=0', flush=True)
         nw = 0
     eval_batch = int(getattr(P, "eval_batch_site", BATCH_SITE) or BATCH_SITE)
     eval_batch = max(1, min(eval_batch, BATCH_SITE))
@@ -3639,7 +3618,7 @@ def _make_rbp_eval_loader(ids: List[str], batch_size: int):
         except Exception as e:
             if not getattr(P, "allow_zero_esm_fallback", False):
                 raise RuntimeError("ESM requested but SiteEmbedder init failed") from e
-            print(f"[warn] ESM init failed for RBP400 evaluation ({e}); using zero ESM fallback", flush=True)
+            print(f"[warn] ESM init failed for evaluation ({e}); using zero ESM fallback", flush=True)
     ds = RBP296Dataset(
         DIPS_ROOT, ids, embedder=emb,
         use_pssm=P.use_pssm,
@@ -3661,7 +3640,7 @@ def _make_rbp_eval_loader(ids: List[str], batch_size: int):
 
 
 def _ensure_model_config_compat(cfg, p):
-    """Fill newer model-only config fields when using an older RBP400 config."""
+    """Fill newer model-only config fields when using an older config."""
     defaults = {
         "l2_d_proj": int(getattr(p, "eb_d_proj", getattr(cfg, "eb_d_proj", 64))),
         "l2_pair_topk": int(getattr(p, "eb_pair_topk", getattr(cfg, "eb_pair_topk", 128))),
@@ -3695,7 +3674,7 @@ def _ensure_model_config_compat(cfg, p):
             setattr(cfg, name, value)
             added.append(name)
     if added:
-        print(f"[cfg][compat] added model fields for current model_L13.py: {','.join(added)}", flush=True)
+        print(f"[cfg][compat] added model fields for current model: {','.join(added)}", flush=True)
     return cfg
 
 
@@ -3830,7 +3809,7 @@ def main():
         f"radius={getattr(P, 'ager_radius', 0.0):.1f}  alpha={getattr(P, 'ager_alpha', 0.0):.2f}  top_m={getattr(P, 'ager_top_m', 0)}",
         flush=True,
     )
-    print(f"[y_pair] source: has_contact (PDB CA-dist < {CONTACT_CUTOFF}Å) "
+    print(f"[y_pair] source: has_contact (PDB CA-dist < {CONTACT_CUTOFF}) "
           f"+ in-batch shuffle negatives", flush=True)
 
     opt = torch.optim.AdamW(model.parameters(), lr=P.lr,
@@ -3848,7 +3827,7 @@ def main():
     best_score = -1e9; best_epoch = 0; best_metrics = {}
     opt.zero_grad()
 
-    print(f"[train] epochs={P.epochs}  steps/ep={spe}  primary={PRIMARY_OBJ}  dataset={DATASET_MODE}  rbp400_root={DIPS_ROOT}", flush=True)
+    print(f"[train] epochs={P.epochs}  steps/ep={spe}  primary={PRIMARY_OBJ}  dataset={DATASET_MODE}  data_root={DIPS_ROOT}", flush=True)
     old_global_score, _ = _load_global_best_score()
     if old_global_score > -1e8:
         print(f"[global-best] current best_{BEST_TAG}={old_global_score:.4f} ckpt={GLOBAL_BEST_CKPT}", flush=True)

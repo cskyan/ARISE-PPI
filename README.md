@@ -2,8 +2,8 @@
 
 ARISE-PPI provides training and prediction code for residue-level protein interaction analysis. The GitHub-ready entry points are:
 
-- `scripts/train.py`: train with either `--task topk` or `--task binary`.
-- `scripts/predict.py`: predict/export results with either `--task topk` or `--task binary`.
+- `scripts/train.py`: train with `--task topk` or `--task binary`.
+- `scripts/predict.py`: predict with `--task topk` or `--task binary`.
 
 ## Install
 
@@ -23,16 +23,16 @@ Keep large datasets outside Git, or place them under ignored folders such as `da
 
 ```text
 data/
-  RBP400/
+  dataset/
     seq/
     PSSM/
     dssp_rsa_asa/
     labels/
     structures/
-  RBP400_full_accessions.txt
-  RBP400_split_train.txt
-  RBP400_split_val.txt
-  RBP400_split_test.txt
+  all_ids.txt
+  train.txt
+  val.txt
+  test.txt
 resources/
   esm/
     esm2_t33_650M_UR50D.pt
@@ -43,19 +43,19 @@ resources/
 Top-k objective:
 
 ```bash
-python scripts/train.py --config configs/rbp400_topk.example.json
+python scripts/train.py --config configs/config.example.json --task topk
 ```
 
 Binary objective:
 
 ```bash
-python scripts/train.py --config configs/rbp400_binary.example.json
+python scripts/train.py --config configs/config.example.json --task binary
 ```
 
 Any config value can be overridden from the command line:
 
 ```bash
-python scripts/train.py --task topk --root /path/to/RBP400 --save-dir runs/my_topk
+python scripts/train.py --task topk --root /path/to/dataset --save-dir runs/my_topk
 ```
 
 ## Predict
@@ -63,13 +63,13 @@ python scripts/train.py --task topk --root /path/to/RBP400 --save-dir runs/my_to
 Top-k prediction:
 
 ```bash
-python scripts/predict.py --config configs/rbp400_topk.example.json --split test --out-dir runs/predict_topk
+python scripts/predict.py --config configs/config.example.json --task topk --split test --out-dir runs/predict_topk
 ```
 
 Binary prediction:
 
 ```bash
-python scripts/predict.py --config configs/rbp400_binary.example.json --split test --out-dir runs/predict_binary
+python scripts/predict.py --config configs/config.example.json --task binary --split test --out-dir runs/predict_binary
 ```
 
 Use `--checkpoint /path/to/best_TOPK.pt` or `--checkpoint /path/to/best_AUPRC.pt` to select an exact checkpoint. Otherwise, `--task topk` selects the top-k checkpoint family and `--task binary` selects the binary/AUPRC checkpoint family.
