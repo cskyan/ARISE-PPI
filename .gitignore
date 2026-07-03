@@ -38,6 +38,10 @@ pp_prepared/
 /*.xlsx
 /*.csv
 /*.pkl
+!/config_L131.py
+!/model_L131.py
+!/train_L131.py
+!/predict_L131.py
 
 # OS/editor
 .DS_Store

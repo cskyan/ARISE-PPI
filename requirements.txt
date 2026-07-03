@@ -1,4 +1,5 @@
 numpy
 scikit-learn
+scipy
 torch
 fair-esm
