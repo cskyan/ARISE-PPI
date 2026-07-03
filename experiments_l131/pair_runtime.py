@@ -90,10 +90,12 @@ def load_pair_manifest(path: str, require_labels: bool = True) -> List[Dict]:
             raise ValueError(f"Row {index + 2} is missing protein_A/protein_B")
         if require_labels:
             row["label"] = as_binary_label(row.get("label"))
-        elif str(row.get("label", "")).strip():
-            row["label"] = as_binary_label(row["label"])
         else:
-            row["label"] = -1
+            raw_label = str(row.get("label", "")).strip().lower()
+            if raw_label in ("", "-1", "unknown", "na", "nan", "none"):
+                row["label"] = -1
+            else:
+                row["label"] = as_binary_label(row["label"])
         row["pair_id"] = str(row.get("pair_id") or f"{a}__{b}")
         row["protein_A"] = a
         row["protein_B"] = b
@@ -118,6 +120,7 @@ def build_runtime(
     trainlib.P.rbp_root = os.path.abspath(root)
     trainlib.P.dips_root = os.path.abspath(root)
     trainlib.P.sequence_mode = str(sequence_mode).lower()
+    trainlib.P.structure_source = "auto"
     if esm_local_dir:
         trainlib.P.esm_local_dir = esm_local_dir
 
@@ -139,7 +142,7 @@ def build_runtime(
         embedder=embedder,
         use_pssm=bool(getattr(trainlib.P, "use_pssm", True)),
         use_dssp=bool(getattr(trainlib.P, "use_dssp", True)),
-        esm_cache_dir=os.path.join(os.path.dirname(os.path.abspath(checkpoint)), "esm_cache"),
+        esm_cache_dir=os.path.join(os.path.abspath(root), "esm_cache"),
         verbose=False,
     )
     samples = {}

@@ -26,7 +26,13 @@ def write_tsv(path: str, rows: Sequence[Dict], fieldnames: Sequence[str] | None 
     if fieldnames is None:
         fieldnames = list(rows[0].keys()) if rows else []
     with fp.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=fieldnames,
+            delimiter="\t",
+            extrasaction="ignore",
+            lineterminator="\n",
+        )
         if fieldnames:
             writer.writeheader()
             writer.writerows(rows)
@@ -35,7 +41,7 @@ def write_tsv(path: str, rows: Sequence[Dict], fieldnames: Sequence[str] | None 
 def write_json(path: str, payload: Dict) -> None:
     fp = Path(path)
     fp.parent.mkdir(parents=True, exist_ok=True)
-    with fp.open("w", encoding="utf-8") as handle:
+    with fp.open("w", encoding="utf-8", newline="\n") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
 
 
@@ -72,6 +78,17 @@ def canonicalize_pairs(rows: Iterable[Dict]) -> Tuple[List[Dict], List[Dict]]:
         label = as_binary_label(row.get("label"))
         first, second = sorted((a, b))
         key = (first, second)
+        if a != first:
+            paired_bases = {
+                name[:-2]
+                for name in row
+                if name.endswith("_A") and f"{name[:-2]}_B" in row
+            }
+            for base in paired_bases:
+                row[f"{base}_A"], row[f"{base}_B"] = (
+                    row[f"{base}_B"],
+                    row[f"{base}_A"],
+                )
         row["protein_A"] = first
         row["protein_B"] = second
         row["label"] = str(label)

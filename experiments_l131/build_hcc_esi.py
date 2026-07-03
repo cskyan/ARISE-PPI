@@ -28,6 +28,9 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--summary", required=True)
     parser.add_argument("--validation-pairs", default="")
+    parser.add_argument("--validation-predictions", default="")
+    parser.add_argument("--validation-faithfulness", default="")
+    parser.add_argument("--validation-symmetry", default="")
     parser.add_argument("--probability-quantile", type=float, default=0.90)
     parser.add_argument("--evidence-quantile", type=float, default=0.75)
     parser.add_argument("--sufficiency-quantile", type=float, default=0.25)
@@ -37,6 +40,21 @@ def main() -> None:
     predictions = read_table(args.predictions)
     faithfulness = read_table(args.faithfulness)
     symmetry = {row["pair_id"]: row for row in read_table(args.symmetry)}
+    validation_predictions_source = (
+        read_table(args.validation_predictions)
+        if args.validation_predictions else predictions
+    )
+    validation_faithfulness_source = (
+        read_table(args.validation_faithfulness)
+        if args.validation_faithfulness else faithfulness
+    )
+    validation_symmetry = {
+        row["pair_id"]: row
+        for row in (
+            read_table(args.validation_symmetry)
+            if args.validation_symmetry else read_table(args.symmetry)
+        )
+    }
     validation_ids = set()
     if args.validation_pairs:
         validation_ids = {
@@ -45,20 +63,31 @@ def main() -> None:
     if not validation_ids:
         validation_ids = {
             row["pair_id"]
-            for row in predictions
+            for row in validation_predictions_source
             if str(row.get("split", "")).lower() == "val"
         }
     if not validation_ids:
-        raise ValueError(
-            "Validation pairs are required through --validation-pairs or a split=val column"
-        )
+        if args.validation_predictions:
+            validation_ids = {
+                row["pair_id"] for row in validation_predictions_source
+            }
+        else:
+            raise ValueError(
+                "Validation pairs are required through --validation-pairs, "
+                "--validation-predictions, or a split=val column"
+            )
 
     faith_by_pair = collections.defaultdict(list)
     for row in faithfulness:
         faith_by_pair[row["pair_id"]].append(row)
+    validation_faith_by_pair = collections.defaultdict(list)
+    for row in validation_faithfulness_source:
+        validation_faith_by_pair[row["pair_id"]].append(row)
 
     validation_predictions = [
-        row for row in predictions if row["pair_id"] in validation_ids
+        row
+        for row in validation_predictions_source
+        if row["pair_id"] in validation_ids
     ]
     if not validation_predictions:
         raise ValueError("No prediction rows matched the validation pair set")
@@ -69,14 +98,17 @@ def main() -> None:
         [numeric(row, "evi_score") for row in validation_predictions], dtype=np.float64
     )
     val_swap = np.asarray([
-        numeric(symmetry.get(row["pair_id"], {}), "abs_probability_difference")
+        numeric(
+            validation_symmetry.get(row["pair_id"], {}),
+            "abs_probability_difference",
+        )
         for row in validation_predictions
     ], dtype=np.float64)
     val_suff = []
     for row in validation_predictions:
         values = [
             numeric(value, "sufficiency_error_probability")
-            for value in faith_by_pair[row["pair_id"]]
+            for value in validation_faith_by_pair[row["pair_id"]]
             if value.get("analysis") == "sufficiency"
             and value.get("method") == "top"
             and value.get("level") == "support"

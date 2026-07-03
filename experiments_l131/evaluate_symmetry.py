@@ -75,9 +75,10 @@ def main() -> None:
     parser.add_argument("--sequence-mode", default="esm", choices=("esm", "light", "hybrid"))
     parser.add_argument("--topk", type=int, default=30)
     parser.add_argument("--threshold", type=float, default=-1.0)
+    parser.add_argument("--require-labels", action="store_true")
     args = parser.parse_args()
 
-    rows = load_pair_manifest(args.manifest, require_labels=True)
+    rows = load_pair_manifest(args.manifest, require_labels=args.require_labels)
     proteins = [p for row in rows for p in (row["protein_A"], row["protein_B"])]
     runtime = build_runtime(
         args.root,
@@ -94,7 +95,7 @@ def main() -> None:
         item_ba = sample_to_pair(
             runtime.samples[row["protein_B"]],
             runtime.samples[row["protein_A"]],
-            label=int(row["label"]),
+            label=max(0, int(row["label"])),
             pair_id=row["pair_id"],
         )
         out_ab = forward_item(runtime, item_ab)
@@ -130,11 +131,16 @@ def main() -> None:
     labels = np.asarray([row["label"] for row in records], dtype=np.int32)
     prob_ab = np.asarray([row["prob_AB"] for row in records], dtype=np.float64)
     prob_avg = np.asarray([row["prob_swap_average"] for row in records], dtype=np.float64)
-    threshold = (
-        float(args.threshold)
-        if args.threshold >= 0
-        else select_threshold(prob_ab, labels, objective="mcc")
+    known = labels >= 0
+    checkpoint_threshold = float(
+        (runtime.checkpoint.get("val_metrics", {}) or {}).get("pair_thr", 0.5)
     )
+    if args.threshold >= 0:
+        threshold = float(args.threshold)
+    elif known.sum() and len(np.unique(labels[known])) > 1:
+        threshold = select_threshold(prob_ab[known], labels[known], objective="mcc")
+    else:
+        threshold = checkpoint_threshold
     differences = np.asarray(
         [row["abs_probability_difference"] for row in records], dtype=np.float64
     )
@@ -145,9 +151,13 @@ def main() -> None:
         "probability_difference_median": float(np.median(differences)),
         "probability_difference_p95": float(np.quantile(differences, 0.95)),
         "probability_difference_p99": float(np.quantile(differences, 0.99)),
-        "AB_metrics": binary_metrics(prob_ab, labels, threshold),
-        "swap_average_metrics": binary_metrics(prob_avg, labels, threshold),
+        "labeled_pairs": int(known.sum()),
     }
+    if known.sum() and len(np.unique(labels[known])) > 1:
+        summary["AB_metrics"] = binary_metrics(prob_ab[known], labels[known], threshold)
+        summary["swap_average_metrics"] = binary_metrics(
+            prob_avg[known], labels[known], threshold
+        )
     out_dir = Path(args.out_dir)
     write_tsv(str(out_dir / "swap_symmetry_per_pair.tsv"), records)
     write_json(str(out_dir / "swap_symmetry_summary.json"), summary)

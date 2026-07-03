@@ -32,7 +32,7 @@ def build_pp(root: Path):
                 coords_b = root / "coords" / f"{right}.npz"
                 if coords_a.exists() and coords_b.exists():
                     rows.append({
-                        "pair_id": f"PP__{pdb_id}__{left}__{right}",
+                        "pair_id": f"PP_POS__{left}__{right}",
                         "protein_A": left,
                         "protein_B": right,
                         "pdb_id": pdb_id,

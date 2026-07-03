@@ -458,7 +458,8 @@ def _resolve_dssp_dir(root: str) -> str:
         d = explicit.strip()
         if not os.path.isabs(d):
             d = os.path.join(root, d)
-        return d
+        if os.path.isdir(d):
+            return d
     return _first_existing_dir(root, ["dssp_rsa_asa", "dssp_asa_rsa", "dssp", "DSSP"])
 
 
@@ -3436,10 +3437,18 @@ def build_loaders():
     if not (use_rbp_dataset or use_dips_dataset):
         raise ValueError(f"Unknown dataset_mode={DATASET_MODE}; expected auto/rbp/dips")
 
+    pair_train_manifest = os.environ.get("PAIR_TRAIN_MANIFEST", "").strip()
+    pair_val_manifest = os.environ.get("PAIR_VAL_MANIFEST", "").strip()
+    pair_test_manifest = os.environ.get("PAIR_TEST_MANIFEST", "").strip()
+    explicit_pair_mode = bool(
+        pair_train_manifest or pair_val_manifest or pair_test_manifest
+    )
     emb = None
     seq_mode = str(getattr(P, "sequence_mode", "light")).lower()
     live_esm_on_miss = bool(getattr(P, "dips_use_embedder_on_miss", False))
-    need_live_esm = seq_mode in ("esm", "hybrid") and (not use_dips_dataset or live_esm_on_miss)
+    need_live_esm = seq_mode in ("esm", "hybrid") and (
+        explicit_pair_mode or not use_dips_dataset or live_esm_on_miss
+    )
     if need_live_esm:
         try:
             print(f"[ESM] live SiteEmbedder enabled | mode={seq_mode} | device={DEVICE}", flush=True)
@@ -3452,9 +3461,6 @@ def build_loaders():
     elif seq_mode in ("esm", "hybrid"):
         print("[ESM] DIPS cache-only mode: no live ESM inference during training", flush=True)
 
-    pair_train_manifest = os.environ.get("PAIR_TRAIN_MANIFEST", "").strip()
-    pair_val_manifest = os.environ.get("PAIR_VAL_MANIFEST", "").strip()
-    pair_test_manifest = os.environ.get("PAIR_TEST_MANIFEST", "").strip()
     if pair_train_manifest or pair_val_manifest or pair_test_manifest:
         if not pair_train_manifest or not pair_val_manifest:
             raise ValueError(

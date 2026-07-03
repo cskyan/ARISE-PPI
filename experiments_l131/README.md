@@ -9,6 +9,62 @@ residue encoders -> EvidenceBridge -> L3Head
 
 The primary route does not use L2Bridge or GC-EB/GPEH.
 
+## Complete Revision Pipeline
+
+The complete workflow is resumable. Existing checkpoints and completed outputs
+are skipped unless `--force` is supplied:
+
+```bash
+cd /srv/storage1/ssd/ysk/jiangbo/PhD/new2
+
+python -m experiments_l131.run_revision_pipeline \
+  --project-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2 \
+  --pp-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/pp_prepared \
+  --rbp-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/RBP400 \
+  --output-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision \
+  --sequence-mode hybrid \
+  --esm-local-dir /path/to/esm/resources \
+  --seeds 1337,2027,3407,4517,5651 \
+  --random-repetitions 100
+```
+
+To generate and audit only the CPU-side manifest and splits:
+
+```bash
+python -m experiments_l131.run_revision_pipeline \
+  --project-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2 \
+  --prepare-only
+```
+
+The full pipeline produces:
+
+```text
+manifests/
+  pp_prepared_labeled_pairs.tsv
+  pp_prepared_labeled_pairs.summary.json
+  pp_prepared_feature_audit.tsv
+  pp_prepared_feature_audit.summary.json
+results/splits/pp_component_seed1337/
+  train.tsv
+  val.tsv
+  test.tsv
+  split_manifest.tsv
+  split_audit.json
+results/plos_revision/
+  pipeline_status.json
+  logs/
+  controls/<variant>/seed_<seed>/
+  validation/{native_eb,symmetry,faithfulness}/
+  test/{native_eb,symmetry,faithfulness}/
+  structure/contact_enrichment/
+  hcc/{native_eb,symmetry,faithfulness,degree_null}/
+  summary/
+    control_metrics_by_seed.tsv
+    control_metrics_aggregate.tsv
+    faithfulness_summary.tsv
+    revision_results_summary.json
+```
+
 ## Project Root
 
 On the original server, run module commands from the repository root:
@@ -57,6 +113,22 @@ pair_id  protein_A  protein_B  label
 
 `label` must be binary. Optional provenance columns such as `data_source`,
 `anchor_id`, and `evidence_type` are preserved by the split tools.
+
+The repository does not assume that a labeled pair table already exists. A
+fixed development manifest can be built from `pp_prepared`:
+
+```bash
+cd /srv/storage1/ssd/ysk/jiangbo/PhD/new2
+python -m experiments_l131.build_pair_manifest \
+  --root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/pp_prepared \
+  --output /srv/storage1/ssd/ysk/jiangbo/PhD/new2/manifests/pp_prepared_labeled_pairs.tsv \
+  --negative-ratio 1 \
+  --seed 1337
+```
+
+Same-complex ligand/receptor chains are structural positives. Cross-complex
+pairs are frozen synthetic negatives and are explicitly marked as such; they
+must not be described as experimentally verified non-interactions.
 
 ## Build Frozen Splits
 
@@ -197,7 +269,9 @@ python -m experiments_l131.build_hcc_esi \
   --predictions results/hcc/predictions.tsv \
   --faithfulness results/hcc/faithfulness.tsv \
   --symmetry results/hcc/symmetry.tsv \
-  --validation-pairs results/splits/val.tsv \
+  --validation-predictions results/validation/native_eb/pair_mode_native_EB_outputs.tsv \
+  --validation-faithfulness results/validation/faithfulness/faithfulness_per_pair.tsv \
+  --validation-symmetry results/validation/symmetry/swap_symmetry_per_pair.tsv \
   --output results/hcc/esi_ledger.tsv \
   --summary results/hcc/esi_summary.json
 

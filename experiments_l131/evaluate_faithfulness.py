@@ -168,9 +168,10 @@ def main() -> None:
     parser.add_argument("--support-budgets", default="1,5,0.10,0.20,0.50")
     parser.add_argument("--random-repetitions", type=int, default=100)
     parser.add_argument("--seed", type=int, default=1337)
+    parser.add_argument("--require-labels", action="store_true")
     args = parser.parse_args()
 
-    rows = load_pair_manifest(args.manifest, require_labels=True)
+    rows = load_pair_manifest(args.manifest, require_labels=args.require_labels)
     proteins = [p for row in rows for p in (row["protein_A"], row["protein_B"])]
     runtime = build_runtime(
         args.root,
@@ -203,7 +204,6 @@ def main() -> None:
             or (args.cohort == "all_positive" and int(row["label"]) == 1)
             or (
                 args.cohort == "predicted_positive"
-                and int(row["label"]) == 1
                 and original["pair_prob"] >= threshold
             )
         )

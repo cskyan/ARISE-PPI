@@ -255,11 +255,29 @@ def main() -> None:
     write_json(str(out_dir / "split_audit.json"), audit)
 
     if args.strategy in ("both_unseen", "homology", "component"):
-        violations = audit["overlap"]["protein_train_test"]
+        violations = (
+            audit["overlap"]["protein_train_val"]
+            + audit["overlap"]["protein_train_test"]
+            + audit["overlap"]["protein_val_test"]
+        )
         if violations:
             raise RuntimeError(f"Protein leakage detected: {violations[:10]}")
-    if args.strategy == "anchor" and audit["overlap"]["anchor_train_test"]:
-        raise RuntimeError("Anchor leakage detected")
+    if args.strategy == "anchor":
+        anchor_violations = (
+            audit["overlap"]["anchor_train_val"]
+            + audit["overlap"]["anchor_train_test"]
+            + audit["overlap"]["anchor_val_test"]
+        )
+        if anchor_violations:
+            raise RuntimeError("Anchor leakage detected")
+    counts = audit["splits"]
+    print(
+        f"[split] strategy={args.strategy} "
+        f"train={counts['train']['pairs']} "
+        f"val={counts['val']['pairs']} "
+        f"test={counts['test']['pairs']} "
+        f"excluded={audit['excluded_pairs']} out={out_dir}"
+    )
 
 
 if __name__ == "__main__":

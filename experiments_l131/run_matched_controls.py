@@ -65,6 +65,7 @@ def main() -> None:
     parser.add_argument("--variants", default=",".join(VARIANTS))
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
     seeds = [int(value.strip()) for value in args.seeds.split(",") if value.strip()]
@@ -108,16 +109,28 @@ def main() -> None:
             if args.dry_run:
                 print(f"[dry-run] {variant} seed={seed} -> {run_dir}")
                 continue
+            checkpoint = run_dir / "checkpoints" / "best_PairAUPRC.pt"
+            if checkpoint.exists() and not args.force:
+                record["status"] = "skipped_existing_checkpoint"
+                record["checkpoint"] = str(checkpoint)
+                write_json(str(output_root / "matched_control_runs.json"), {"runs": runs})
+                print(f"[resume] {variant} seed={seed} checkpoint exists")
+                continue
             run_dir.mkdir(parents=True, exist_ok=True)
             environment = os.environ.copy()
             environment.update(env_updates)
-            completed = subprocess.run(
-                command,
-                cwd=str(project_root),
-                env=environment,
-                check=False,
-            )
+            log_path = run_dir / "training.log"
+            with log_path.open("w", encoding="utf-8") as log_handle:
+                completed = subprocess.run(
+                    command,
+                    cwd=str(project_root),
+                    env=environment,
+                    stdout=log_handle,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                )
             record["return_code"] = int(completed.returncode)
+            record["log"] = str(log_path)
             record["status"] = "completed" if completed.returncode == 0 else "failed"
             write_json(str(output_root / "matched_control_runs.json"), {"runs": runs})
             if completed.returncode != 0:

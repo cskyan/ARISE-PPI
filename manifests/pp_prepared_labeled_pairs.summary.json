@@ -1,0 +1,10 @@
+{
+  "complete_complexes": 271,
+  "negative_label_warning": "Cross-complex negatives are frozen synthetic controls and are not experimentally verified non-interactions.",
+  "negative_ratio_requested": 1,
+  "positive_pairs": 271,
+  "proteins": 542,
+  "root": "pp_prepared",
+  "seed": 1337,
+  "synthetic_negative_pairs": 271
+}
