@@ -3,6 +3,13 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
+PROJECT_ROOT = os.path.abspath(
+    os.environ.get("ARISE_PPI_ROOT", os.path.dirname(os.path.abspath(__file__)))
+)
+DEFAULT_DATA_ROOT = os.path.join(PROJECT_ROOT, "Dest_prepared")
+DEFAULT_RUN_ROOT = os.path.join(PROJECT_ROOT, "runs", "L131")
+DEFAULT_ESM_ROOT = os.path.join(PROJECT_ROOT, "resources", "esm")
+
 # MedAUC boost configuration.
 # Main changes: explicit coords source, enabled inter-chain geometry prior,
 # larger L2 focus region, stronger L2/ranking losses, and longer early stopping.
@@ -47,18 +54,18 @@ class Params:
     dataset_mode: str = "rbp"           # rbp | pair | custom; NEVER defaults to DIPS in this branch
     primary_objective: str = "binary"   # binary | topk | pair; binary/site is the current DEST-style benchmark; set pair explicitly for true L3 data
     # Keep legacy dips_* names only for backward compatibility; default root follows rbp/custom data.
-    dips_root: str = "data"
-    rbp_root: str = "data"
-    rbp_id_list: str = "data/all_ids.txt"
-    rbp_train_list: str = "data/train.txt"
-    rbp_val_list: str = "data/val.txt"
-    rbp_test_list: str = "data/test.txt"
-    dips_train_list: str = "data/train.txt"
-    dips_val_list: str = "data/val.txt"
-    dips_test_list: str = "data/test.txt"
-    save_dir: str = "runs/L131"
+    dips_root: str = DEFAULT_DATA_ROOT
+    rbp_root: str = DEFAULT_DATA_ROOT
+    rbp_id_list: str = os.path.join(DEFAULT_DATA_ROOT, "all_ids.txt")
+    rbp_train_list: str = os.path.join(DEFAULT_DATA_ROOT, "train.txt")
+    rbp_val_list: str = os.path.join(DEFAULT_DATA_ROOT, "val.txt")
+    rbp_test_list: str = os.path.join(DEFAULT_DATA_ROOT, "test.txt")
+    dips_train_list: str = os.path.join(DEFAULT_DATA_ROOT, "train.txt")
+    dips_val_list: str = os.path.join(DEFAULT_DATA_ROOT, "val.txt")
+    dips_test_list: str = os.path.join(DEFAULT_DATA_ROOT, "test.txt")
+    save_dir: str = DEFAULT_RUN_ROOT
     save_epoch_ckpts: bool = False
-    esm_local_dir: str = "resources/esm"
+    esm_local_dir: str = DEFAULT_ESM_ROOT
     rbp_structure_dir: str = "coords"
     # DSSP/RSA feature control. If rbp_dssp_dir is empty, loader prefers
     # root/dssp_rsa_asa, then root/dssp_asa_rsa, then legacy root/dssp.

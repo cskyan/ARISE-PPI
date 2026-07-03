@@ -49,7 +49,7 @@ except Exception:
     autocast = None
     GradScaler = None
 
-from config_L131 import Params, build_model_config
+from config_L131 import PROJECT_ROOT, Params, build_model_config
 from model_L131 import L13PDBGVPModel
 
 # ============================================================
@@ -71,7 +71,7 @@ def _force_dest_binary_params(p):
         return p
     dest_root = os.environ.get(
         "DEST_PREPARED_ROOT",
-        os.path.join("data", "Dest_prepared"),
+        os.path.join(PROJECT_ROOT, "Dest_prepared"),
     )
     p.dataset_mode = "rbp"
     p.primary_objective = "binary"
@@ -83,7 +83,7 @@ def _force_dest_binary_params(p):
     p.rbp_test_list = os.path.join(dest_root, "test.txt")
     p.save_dir = os.environ.get(
         "DEST_SAVE_DIR",
-        os.path.join("runs", "L131_Dest"),
+        os.path.join(PROJECT_ROOT, "runs", "L131_Dest"),
     )
     p.rbp_structure_dir = "coords"
     p.structure_source = "coords"

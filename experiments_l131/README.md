@@ -9,6 +9,23 @@ residue encoders -> EvidenceBridge -> L3Head
 
 The primary route does not use L2Bridge or GC-EB/GPEH.
 
+## Project Root
+
+On the original server, run module commands from the repository root:
+
+```bash
+cd /srv/storage1/ssd/ysk/jiangbo/PhD/new2
+export ARISE_PPI_ROOT=/srv/storage1/ssd/ysk/jiangbo/PhD/new2
+```
+
+`config_L131.py` uses its own directory as the default project root. When the
+file is located at the path above, default data and output paths are resolved
+under that directory instead of the current shell directory.
+
+Do not run `python -m experiments_l131.<module>` while the shell is inside the
+`experiments_l131` directory. Return to the repository root or execute the
+script directly from that directory.
+
 ## Environment
 
 Create an isolated environment from the repository root:
@@ -44,11 +61,22 @@ pair_id  protein_A  protein_B  label
 ## Build Frozen Splits
 
 ```bash
+cd /srv/storage1/ssd/ysk/jiangbo/PhD/new2
 python -m experiments_l131.build_splits \
-  --manifest data/pairs.tsv \
+  --manifest /path/to/labeled_pairs.tsv \
   --strategy both_unseen \
   --seed 1337 \
-  --out-dir results/splits/both_unseen
+  --out-dir /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/both_unseen
+```
+
+Equivalent command when already inside `experiments_l131`:
+
+```bash
+python build_splits.py \
+  --manifest /path/to/labeled_pairs.tsv \
+  --strategy both_unseen \
+  --seed 1337 \
+  --out-dir ../results/splits/both_unseen
 ```
 
 Available strategies are `pair_random`, `one_unseen`, `both_unseen`,

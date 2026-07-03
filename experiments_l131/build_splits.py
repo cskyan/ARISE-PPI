@@ -7,6 +7,10 @@ import random
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Set, Tuple
 
+if __package__ in (None, ""):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from experiments_l131.common import (
     canonicalize_pairs,
     read_table,

@@ -10,6 +10,10 @@ from typing import Dict, List, Sequence
 import numpy as np
 import torch
 
+if __package__ in (None, ""):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from experiments_l131.common import write_json, write_tsv
 from experiments_l131.pair_runtime import (
     build_runtime,
