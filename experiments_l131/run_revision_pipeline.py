@@ -10,7 +10,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from experiments_l131.common import read_table, write_json
+from experiments_l131.common import read_table, write_json, write_tsv
 
 
 def main() -> None:
@@ -398,7 +398,26 @@ def main() -> None:
             expected=[hcc_faithfulness / "faithfulness_per_pair.tsv"],
         )
     else:
-        raise RuntimeError("No HCC candidates passed the validation-frozen probability gate")
+        write_tsv(
+            str(hcc_symmetry / "swap_symmetry_per_pair.tsv"),
+            [],
+            fieldnames=("pair_id", "abs_probability_difference"),
+        )
+        write_tsv(
+            str(hcc_faithfulness / "faithfulness_per_pair.tsv"),
+            [],
+            fieldnames=(
+                "pair_id", "analysis", "method", "level",
+                "comprehensiveness_probability",
+                "sufficiency_error_probability",
+            ),
+        )
+        records.append({
+            "stage": "14_15_hcc_mechanism_analysis",
+            "status": "completed_empty_cohort",
+            "selected_pairs": 0,
+        })
+        save_state()
 
     hcc_ledger = output / "hcc" / "HCC_ESI_ledger.tsv"
     run_stage(
