@@ -138,16 +138,21 @@ First build a structure manifest:
 
 ```bash
 python -m experiments_l131.build_structure_manifest \
-  --pp-root pp_prepared \
-  --dest-root Dest_prepared \
-  --out results/structure/structure_manifest.tsv
+  --dataset pp \
+  --root pp_prepared \
+  --output results/structure/pp_structure_manifest.tsv
+
+python -m experiments_l131.build_structure_manifest \
+  --dataset dest \
+  --root Dest_prepared \
+  --output results/structure/dest_structure_manifest.tsv
 ```
 
 Then evaluate native supports:
 
 ```bash
 python -m experiments_l131.evaluate_contacts \
-  --structure-manifest results/structure/structure_manifest.tsv \
+  --structure-manifest results/structure/pp_structure_manifest.tsv \
   --supports results/native_eb/native_eb_supports.tsv \
   --candidates results/native_eb/native_eb_candidates.tsv \
   --out-dir results/structure/contact_enrichment
@@ -164,14 +169,14 @@ python -m experiments_l131.build_hcc_esi \
   --predictions results/hcc/predictions.tsv \
   --faithfulness results/hcc/faithfulness.tsv \
   --symmetry results/hcc/symmetry.tsv \
-  --validation-predictions results/validation/predictions.tsv \
-  --validation-faithfulness results/validation/faithfulness.tsv \
-  --validation-symmetry results/validation/symmetry.tsv \
-  --out-dir results/hcc/esi
+  --validation-pairs results/splits/val.tsv \
+  --output results/hcc/esi_ledger.tsv \
+  --summary results/hcc/esi_summary.json
 
 python -m experiments_l131.degree_matched_null \
   --network RBP400/annotations/string_network.tsv \
-  --module results/hcc/esi/selected_module.tsv \
+  --module results/hcc/selected_module.tsv \
+  --universe results/hcc/candidate_universe.tsv \
   --out-dir results/hcc/degree_null \
   --repetitions 1000
 ```
