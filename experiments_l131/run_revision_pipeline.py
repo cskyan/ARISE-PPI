@@ -10,6 +10,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from config_L131 import DEFAULT_ESM_ROOT
 from experiments_l131.common import read_table, write_json, write_tsv
 
 
@@ -27,7 +28,7 @@ def main() -> None:
     parser.add_argument("--string-network", default="")
     parser.add_argument("--output-root", default="")
     parser.add_argument("--sequence-mode", default="hybrid", choices=("esm", "light", "hybrid"))
-    parser.add_argument("--esm-local-dir", default="")
+    parser.add_argument("--esm-local-dir", default=DEFAULT_ESM_ROOT)
     parser.add_argument("--seeds", default="1337,2027,3407,4517,5651")
     parser.add_argument(
         "--variants",
@@ -57,8 +58,7 @@ def main() -> None:
     os.environ["SEQUENCE_MODE"] = args.sequence_mode
     os.environ["STRUCTURE_SOURCE"] = "auto"
     os.environ["ESM_CACHE_DIR"] = str(pp_root / "esm_cache")
-    if args.esm_local_dir:
-        os.environ["ESM_LOCAL_DIR"] = args.esm_local_dir
+    os.environ["ESM_LOCAL_DIR"] = args.esm_local_dir
     records = []
     state_path = output / "pipeline_status.json"
 
@@ -165,6 +165,15 @@ def main() -> None:
         save_state()
         print(f"[pipeline] preparation complete: {state_path}")
         return
+
+    if args.sequence_mode in ("esm", "hybrid"):
+        esm_checkpoint = (
+            Path(args.esm_local_dir) / "esm2_t33_650M_UR50D.pt"
+        )
+        if not esm_checkpoint.exists():
+            raise FileNotFoundError(
+                f"Configured ESM checkpoint does not exist: {esm_checkpoint}"
+            )
 
     controls = output / "controls"
     control_variants = [

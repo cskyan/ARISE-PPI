@@ -8,7 +8,19 @@ PROJECT_ROOT = os.path.abspath(
 )
 DEFAULT_DATA_ROOT = os.path.join(PROJECT_ROOT, "Dest_prepared")
 DEFAULT_RUN_ROOT = os.path.join(PROJECT_ROOT, "runs", "L131")
-DEFAULT_ESM_ROOT = os.path.join(PROJECT_ROOT, "resources", "esm")
+LEGACY_ESM_ROOT = (
+    "/srv/storage/ssd/ysk/jiangbo/PhD/"
+    "\u670d\u52a1\u5668/new1/resources/esm"
+)
+PROJECT_ESM_ROOT = os.path.join(PROJECT_ROOT, "resources", "esm")
+DEFAULT_ESM_ROOT = next(
+    (
+        path
+        for path in (PROJECT_ESM_ROOT, LEGACY_ESM_ROOT)
+        if os.path.isfile(os.path.join(path, "esm2_t33_650M_UR50D.pt"))
+    ),
+    LEGACY_ESM_ROOT,
+)
 
 # MedAUC boost configuration.
 # Main changes: explicit coords source, enabled inter-chain geometry prior,

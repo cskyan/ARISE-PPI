@@ -17,23 +17,13 @@ are skipped unless `--force` is supplied:
 ```bash
 cd /srv/storage1/ssd/ysk/jiangbo/PhD/new2
 
-python -m experiments_l131.run_revision_pipeline \
-  --project-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2 \
-  --pp-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/pp_prepared \
-  --rbp-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/RBP400 \
-  --output-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision \
-  --sequence-mode hybrid \
-  --esm-local-dir /path/to/esm/resources \
-  --seeds 1337,2027,3407,4517,5651 \
-  --random-repetitions 100
+python -m experiments_l131.run_revision_pipeline
 ```
 
 To generate and audit only the CPU-side manifest and splits:
 
 ```bash
-python -m experiments_l131.run_revision_pipeline \
-  --project-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2 \
-  --prepare-only
+python -m experiments_l131.run_revision_pipeline --prepare-only
 ```
 
 The full pipeline produces:
@@ -135,20 +125,22 @@ must not be described as experimentally verified non-interactions.
 ```bash
 cd /srv/storage1/ssd/ysk/jiangbo/PhD/new2
 python -m experiments_l131.build_splits \
-  --manifest /path/to/labeled_pairs.tsv \
-  --strategy both_unseen \
+  --manifest /srv/storage1/ssd/ysk/jiangbo/PhD/new2/manifests/pp_prepared_labeled_pairs.tsv \
+  --strategy component \
   --seed 1337 \
-  --out-dir /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/both_unseen
+  --ratios 0.7,0.15,0.15 \
+  --out-dir /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337
 ```
 
 Equivalent command when already inside `experiments_l131`:
 
 ```bash
 python build_splits.py \
-  --manifest /path/to/labeled_pairs.tsv \
-  --strategy both_unseen \
+  --manifest ../manifests/pp_prepared_labeled_pairs.tsv \
+  --strategy component \
   --seed 1337 \
-  --out-dir ../results/splits/both_unseen
+  --ratios 0.7,0.15,0.15 \
+  --out-dir ../results/splits/pp_component_seed1337
 ```
 
 Available strategies are `pair_random`, `one_unseen`, `both_unseen`,
@@ -161,17 +153,17 @@ manifest, excluded-pair ledger, and leakage audit.
 ## Train the Primary Model
 
 ```bash
-DATA_ROOT=/path/to/prepared/proteins \
-PAIR_TRAIN_MANIFEST=/path/to/train.tsv \
-PAIR_VAL_MANIFEST=/path/to/val.tsv \
-PAIR_TEST_MANIFEST=/path/to/test.tsv \
+DATA_ROOT=/srv/storage1/ssd/ysk/jiangbo/PhD/new2/pp_prepared \
+PAIR_TRAIN_MANIFEST=/srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337/train.tsv \
+PAIR_VAL_MANIFEST=/srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337/val.tsv \
+PAIR_TEST_MANIFEST=/srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337/test.tsv \
 DATASET_MODE=pair \
 PRIMARY_OBJECTIVE=pair \
 PAIR_HEAD_TYPE=eb \
 EB_PROPOSAL_MODE=top \
 EB_SUPPORT_MODE=top \
 MANUSCRIPT_PRIMARY=1 \
-SAVE_DIR=results/full_eb/seed_1337 \
+SAVE_DIR=/srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision/controls/full_eb/seed_1337 \
 SEED=1337 \
 python train_L131.py
 ```
@@ -183,11 +175,11 @@ threshold is selected during validation and frozen for test evaluation.
 
 ```bash
 python -m experiments_l131.run_matched_controls \
-  --data-root /path/to/prepared/proteins \
-  --train-manifest /path/to/train.tsv \
-  --val-manifest /path/to/val.tsv \
-  --test-manifest /path/to/test.tsv \
-  --output-root results/controls
+  --data-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/pp_prepared \
+  --train-manifest /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337/train.tsv \
+  --val-manifest /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337/val.tsv \
+  --test-manifest /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337/test.tsv \
+  --output-root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision/controls
 ```
 
 The default matrix runs five seeds for the full EB model, no-EB model,
@@ -199,10 +191,10 @@ starting training.
 
 ```bash
 python -m experiments_l131.export_native_eb \
-  --root /path/to/prepared/proteins \
-  --checkpoint /path/to/best_checkpoint.pt \
-  --manifest /path/to/test.tsv \
-  --out-dir results/native_eb \
+  --root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/pp_prepared \
+  --checkpoint /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision/controls/full_eb/seed_1337/checkpoints/best_PairAUPRC.pt \
+  --manifest /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337/test.tsv \
+  --out-dir /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision/test/native_eb \
   --require-native-eb \
   --export-candidates
 ```
@@ -215,16 +207,16 @@ site probabilities.
 
 ```bash
 python -m experiments_l131.evaluate_symmetry \
-  --root /path/to/prepared/proteins \
-  --checkpoint /path/to/best_checkpoint.pt \
-  --manifest /path/to/test.tsv \
-  --out-dir results/symmetry
+  --root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/pp_prepared \
+  --checkpoint /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision/controls/full_eb/seed_1337/checkpoints/best_PairAUPRC.pt \
+  --manifest /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337/test.tsv \
+  --out-dir /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision/test/symmetry
 
 python -m experiments_l131.evaluate_faithfulness \
-  --root /path/to/prepared/proteins \
-  --checkpoint /path/to/best_checkpoint.pt \
-  --manifest /path/to/test.tsv \
-  --out-dir results/faithfulness \
+  --root /srv/storage1/ssd/ysk/jiangbo/PhD/new2/pp_prepared \
+  --checkpoint /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision/controls/full_eb/seed_1337/checkpoints/best_PairAUPRC.pt \
+  --manifest /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/splits/pp_component_seed1337/test.tsv \
+  --out-dir /srv/storage1/ssd/ysk/jiangbo/PhD/new2/results/plos_revision/test/faithfulness \
   --random-repetitions 100
 ```
 
